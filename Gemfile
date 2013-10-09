@@ -1,0 +1,5 @@
+source 'http://rubygems.org'
+gem 'sane-ffi'
+gem 'rest-client'
+gem 'activesupport'
+gem 'daemons'
