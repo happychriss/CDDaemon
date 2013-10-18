@@ -114,7 +114,7 @@ class Converter
 
   def convert_jpg(f, source_extension='')
     puts "Start converting to jpg..."
-    res=%x[convert '#{f.path+source_extension}'[0] -resize x770 jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
+    res=%x[convert '#{f.path+source_extension}'[0] -flatten -resize x770 jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
     result_jpg=File.read(f.path+'.conv')
     puts "ok"
     result_jpg
@@ -122,7 +122,7 @@ class Converter
 
   def convert_sjpg(f, source_extension='')
     puts "Start converting to sjpg..."
-    res=%x[convert '#{f.path+source_extension}'[0] -resize 350x490\! jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
+    res=%x[convert '#{f.path+source_extension}'[0] -flatten -resize 350x490\! jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
     result_sjpg=File.read(f.path+'.conv')
     puts "ok"
     result_sjpg
