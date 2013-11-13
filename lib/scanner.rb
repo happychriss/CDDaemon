@@ -67,7 +67,7 @@ class Scanner
           scanned_files.each do |f_scanned_ppm|
             sleep_count=0
 
-            if not system "empty-page -m 256 -i '#{f_scanned_ppm}'" then
+            if not system "empty-page -p 0.6 -i '#{f_scanned_ppm}'" then
               f=f_scanned_ppm.split('.')[0] #name without extension
 
               if @scanned_documents.index(f).nil?
@@ -134,6 +134,8 @@ class Scanner
        "--batch=" + scan_tmp_file,
        "--source="+ source,
        "2>&1"].each { |c| scan=scan+c+" " }
+
+      puts "Scan Command: #{scan}"
 
       return scan
 

@@ -1,1 +1,6 @@
 This file was created by JetBrains RubyMine 5.4.3.2.1 for binding GitHub repository
+Dependencies:
+sudo apt-get install unpaper
+abbyyocr
+sudo apt-get install exactimage
+convert
