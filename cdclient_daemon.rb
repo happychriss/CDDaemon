@@ -15,8 +15,9 @@ TEST=true
 
 def StartDrb(uri, object)
   puts "Start DRB service for: #{object.class.name} with uri: #{uri}"
-  RestClient.post CD_SERVER+'/status_drb', {:drb_server => object.class.name, :running => true}, :content_type => :json, :accept => :json
   DRb.start_service(uri, object) # replace localhost with 0.0.0.0 to allow conns from outside
+  sleep(1)
+  RestClient.post CD_SERVER+'/status_drb', {:drb_server => object.class.name, :running => true}, :content_type => :json, :accept => :json
 end
 
 def StopDrb(uri, object)
@@ -36,6 +37,7 @@ def run_drb_daemons
     ensure
       StopDrb(URI_SCANNER, scanner)
       StopDrb(URI_SCANNER, converter)
+      sleep(1)
       DRb.stop_service
     end
   end

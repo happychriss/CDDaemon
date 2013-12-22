@@ -5,6 +5,10 @@ class Scanner
 
   include Support
 
+  def me_alive?
+    true
+  end
+
   def initialize
     @doc_name_index='000'
     @scanned_documents=Array.new
@@ -73,7 +77,7 @@ class Scanner
               if @scanned_documents.index(f).nil?
                 scanner_status_update("Cleaning")
 
-                res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
                 raise "Error unpaper - #{res1}" unless res1[0..10] == "unpaper 0.4"
 
                 res2 = %x[convert '#{f}.unpaper.ppm' '#{f}.converted.jpg']
@@ -85,7 +89,7 @@ class Scanner
                 scanner_status_update("Upload to server")
                 @scanned_documents.push(f)
 
-                RestClient.post CD_SERVER+'/upload_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb'), :source => 1}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
+                RestClient.post CD_SERVER+'/create_from_scanner_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb'), :source => 1}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
 
                 res4 = FileUtils.rm "#{f}.unpaper.ppm"
 

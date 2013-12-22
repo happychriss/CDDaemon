@@ -6,6 +6,10 @@ class Converter
 
   include Support
 
+  def alive?
+    true
+  end
+
   def run_conversion(data, mime_type)
 
     begin
@@ -13,90 +17,102 @@ class Converter
       f = Tempfile.new("cd2_remote")
       f.write(data)
       f.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
+      fpath=f.path #full path to the file to be processed
 
       puts "********* Start operation for mime_type: #{mime_type.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
 
       if [:PDF].include?(mime_type) then
 
         check_program('convert'); check_program('abbyyocr')
-        puts "------------ Start pdf convertion: Source: '#{f.path}' Target: '#{f.path+'.conv'}'----------"
+        puts "------------ Start pdf convertion: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
-        result_sjpg = convert_sjpg(f)
-        result_jpg = convert_jpg(f)
+        result_sjpg = convert_sjpg(fpath)
+        result_jpg = convert_jpg(fpath)
 
         puts "Start abbyyocr..."
-        command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{f.path}' -tet UTF8 -of '#{f.path}.conv.txt'"
+        command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
         res = %x[#{command}]
 
-        result_txt = read_txt_from_conv_txt(f.untaint)
+        result_txt = read_txt_from_conv_txt(fpath.untaint)
 
         puts "Read original file..."
-        result_pdf=File.read(f.path.untaint) # original file
+
+        result_orginal=data
 
         puts "ok"
 
-      elsif [:JPG, :JPG_SCANNED].include?(mime_type) then
+      ### jpgs will be converted into PDF
+      elsif [:JPG].include?(mime_type) then
+
 
         check_program('convert'); check_program('pdftotext'); check_program('abbyyocr')
-        puts "------------ Start convertion for pdf or jpg: Source: '#{f.path}' Target: '#{f.path+'.conv'}'----------"
+        puts "------------ Start conversion for jpg: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
-        result_sjpg = convert_sjpg(f)
-        result_jpg = convert_jpg(f)
+
+        fopath=fpath+'.orient'
+        res=%x[convert '#{fpath}'[0] -auto-orient jpg:'#{fopath}'] #convert only first page if more exists
+
+        result_sjpg = convert_sjpg(fopath)
+        result_jpg = convert_jpg(fopath)
 
         puts "Start abbyyocr..."
-        command="abbyyocr -rl German GermanNewSpelling  -if '#{f.path}'  -f PDF -pem ImageOnText -pfpr original -of '#{f.path}.conv'"
+        command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}'  -f PDF -pem ImageOnText -pfpr original -of '#{fpath}.conv'"
         res = %x[#{command}]
 
-        result_pdf=File.read(f.path.untaint+'.conv')
+        result_orginal=File.read(fpath.untaint+'.conv')   ## PDF return
+
         puts "ok with res: #{res}"
 
         puts "Start pdftotxt..."
         ## Extract text data and store in database
-        res=%x[pdftotext -layout '#{f.path+'.conv'}' #{f.path+'.conv.txt'}]
-        result_txt = read_txt_from_conv_txt(f)
+        res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
+        result_txt = read_txt_from_conv_txt(fpath)
 
       elsif [:MS_EXCEL, :MS_WORD, :ODF_CALC, :ODF_WRITER].include?(mime_type) then
 
-        check_program('convert'); check_program('html2ps'); check_program('tika-app-1.4.jar') ##jar can be called directly
+        tika_path=File.join(Dir.pwd,"lib","tika-app-1.4.jar")
+
+        check_program('convert'); check_program('html2ps'); check_program(tika_path) ##jar can be called directly
 
         ############### Create Preview Pictures of uploaded file
 
-        puts "------------ Start convertion for pdf or jpg: Source: '#{f.path}' ----------"
+        puts "------------ Start conversion for pdf or jpg: Source: '#{fpath}' ----------"
 
         ## Tika ############################### http://tika.apache.org/
         puts "Start Tika Conversion..."
-        command="tika-app-1.4.jar -h '#{f.path}' >> #{f.path+'.conv.html'}"
+        command="#{tika_path} -h '#{fpath}' >> #{fpath+'.conv.html'}"
         res=%x[#{command}]
         puts "ok, Result: #{res}"
 
         puts "Start converting to pre-jpg original size..."
-        res=%x[convert '#{f.path+'.conv.html'}'[0] jpg:'#{f.path+'.conv.tmp'}'] #convert only first page if more exists
+        res=%x[convert '#{fpath+'.conv.html'}'[0] jpg:'#{fpath+'.conv.tmp'}'] #convert only first page if more exists
         puts "ok"
 
-        result_sjpg = convert_sjpg(f, '.conv.tmp')
-        result_jpg = convert_jpg(f, '.conv.tmp')
+        result_sjpg = convert_sjpg(fpath, '.conv.tmp')
+        result_jpg = convert_jpg(fpath, '.conv.tmp')
 
         ################ Extract Test from uploaded file
 
         puts "Start tika to extract text..."
-        res=%x[tika-app-1.4.jar -t '#{f.path}' >> #{f.path+'.conv.txt'}]
+        res=%x[#{tika_path} -t '#{fpath}' >> #{fpath+'.conv.txt'}]
 
-        result_txt = read_txt_from_conv_txt(f)
-        result_pdf=nil
+        result_txt = read_txt_from_conv_txt(fpath)
+
+        result_orginal=data
 
       else
         raise "Unkonw mime -type  *#{mime_type}*"
       end
 
-      puts "Clean-up with: #{f.path+'*'}..."
+      puts "Clean-up with: #{fpath+'*'}..."
                 #### Cleanup and return
-      Dir.glob(f.path+'*').each do |l|
+      Dir.glob(fpath+'*').each do |l|
         l.untaint
         File.delete(l)
       end
       puts "ok"
       puts "--------- Completed and  file deleted------------"
-      return result_jpg, result_sjpg, result_pdf, result_txt, 'OK'
+      return result_jpg, result_sjpg, result_orginal,result_txt, 'OK'
 
     rescue Exception => e
       puts "Error:"+ e.message
@@ -104,26 +120,26 @@ class Converter
     end
   end
 
-  def read_txt_from_conv_txt(f)
+  def read_txt_from_conv_txt(fpath)
     puts "    start reading textfile"
     result_txt=''
-    File.open(f.path+'.conv.txt', 'r') { |l| result_txt=l.read }
+    File.open(fpath+'.conv.txt', 'r') { |l| result_txt=l.read }
     puts "ok"
     return result_txt
   end
 
-  def convert_jpg(f, source_extension='')
+  def convert_jpg(fpath, source_extension='')
     puts "Start converting to jpg..."
-    res=%x[convert '#{f.path+source_extension}'[0] -flatten -resize x770 jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
-    result_jpg=File.read(f.path+'.conv')
+    res=%x[convert '#{fpath+source_extension}'[0]   -flatten -resize x770 jpg:'#{fpath+'.conv'}'] #convert only first page if more exists
+    result_jpg=File.read(fpath+'.conv')
     puts "ok"
     result_jpg
   end
 
-  def convert_sjpg(f, source_extension='')
+  def convert_sjpg(fpath, source_extension='')
     puts "Start converting to sjpg..."
-    res=%x[convert '#{f.path+source_extension}'[0] -flatten -resize 350x490\! jpg:'#{f.path+'.conv'}'] #convert only first page if more exists
-    result_sjpg=File.read(f.path+'.conv')
+    res=%x[convert '#{fpath+source_extension}'[0]  -flatten -resize 350x490\! jpg:'#{fpath+'.conv'}'] #convert only first page if more exists
+    result_sjpg=File.read(fpath+'.conv')
     puts "ok"
     result_sjpg
   end
