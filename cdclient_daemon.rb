@@ -36,7 +36,7 @@ def run_drb_daemons
     rescue Interrupt
     ensure
       StopDrb(URI_SCANNER, scanner)
-      StopDrb(URI_SCANNER, converter)
+      StopDrb(URI_CONVERTER, converter)
       sleep(1)
       DRb.stop_service
     end
