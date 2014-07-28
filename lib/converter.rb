@@ -10,7 +10,7 @@ class Converter
     true
   end
 
-  def run_conversion(data, mime_type)
+  def run_conversion(data, mime_type,source)
 
     begin
 
@@ -19,7 +19,7 @@ class Converter
       f.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
       fpath=f.path #full path to the file to be processed
 
-      puts "********* Start operation for mime_type: #{mime_type.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
+      puts "********* Start operation for mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
 
       if [:PDF].include?(mime_type) then
 
@@ -56,8 +56,29 @@ class Converter
         result_jpg = convert_jpg(fopath)
 
         puts "Start abbyyocr..."
-        command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}'  -f PDF -pem ImageOnText -pfpr original -of '#{fpath}.conv'"
-        res = %x[#{command}]
+
+        ## pfq 20, reduce quality to 20% if from scanner
+
+        if source==0 then #Source is scanner, reduce size
+          reduce='-pfq 20'
+          puts "XXXXXSource is scanner, reduction with: #{reduce}"
+
+          command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
+          res = %x[#{command}]
+
+          ## change size to normal a4
+          command="gs -o '#{fpath}.conv' -sDEVICE=pdfwrite  -dPDFFitPage -r300x300  -g2480x3508  '#{fpath}.big.conv'"
+          res = %x[#{command}]
+        else
+          reduce='-pfpr original'
+          puts "yyyyyy Source is not scanner, dont reduce jpg with: #{reduce}"
+
+          command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
+          res = %x[#{command}]
+        end
+
+
+
 
         result_orginal=File.read(fpath.untaint+'.conv')   ## PDF return
 
@@ -108,7 +129,7 @@ class Converter
                 #### Cleanup and return
       Dir.glob(fpath+'*').each do |l|
         l.untaint
-        File.delete(l)
+       File.delete(l)
       end
       puts "ok"
       puts "--------- Completed and  file deleted------------"

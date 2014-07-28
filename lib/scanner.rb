@@ -61,7 +61,7 @@ class Scanner
       t=Thread.new do
 
         until @scann_converter_terminate do
-          sleep 0.5; sleep_count=sleep_count+0.5
+          sleep 1; sleep_count=sleep_count+1
           if sleep_count>50 then
             @scann_converter_terminate=true
           end
@@ -77,7 +77,7 @@ class Scanner
               if @scanned_documents.index(f).nil?
                 scanner_status_update("Cleaning")
 
-                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
                 raise "Error unpaper - #{res1}" unless res1[0..10] == "unpaper 0.4"
 
                 res2 = %x[convert '#{f}.unpaper.ppm' '#{f}.converted.jpg']
@@ -97,7 +97,7 @@ class Scanner
 
               end
             end
-            res6=FileUtils.rm f_scanned_ppm
+             res6=FileUtils.rm f_scanned_ppm
           end
 
           puts "--check for new work"
@@ -133,6 +133,9 @@ class Scanner
       ["scanimage",
        "--device=" + device,
        "--mode=" + mode,
+       "--contrast=" + "60",
+       "--brightness=" + "50",
+       "--format=" + "ppm",
        "--resolution=" + resolution,
        "--format=" + "ppm",
        "--batch=" + scan_tmp_file,
