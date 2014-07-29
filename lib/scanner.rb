@@ -133,7 +133,7 @@ class Scanner
       ["scanimage",
        "--device=" + device,
        "--mode=" + mode,
-       "--contrast=" + "60",
+       "--contrast=" + "70",
        "--brightness=" + "50",
        "--format=" + "ppm",
        "--resolution=" + resolution,
