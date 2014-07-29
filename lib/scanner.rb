@@ -134,7 +134,7 @@ class Scanner
        "--device=" + device,
        "--mode=" + mode,
        "--contrast=" + "70",
-       "--brightness=" + "50",
+       "--brightness=" + "40",
        "--format=" + "ppm",
        "--resolution=" + resolution,
        "--format=" + "ppm",
