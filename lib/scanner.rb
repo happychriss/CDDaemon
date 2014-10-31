@@ -5,11 +5,14 @@ class Scanner
 
   include Support
 
+  attr_reader :daemon_config
+
   def me_alive?
     true
   end
 
-  def initialize
+  def initialize(daemon_config)
+    @daemon_config=daemon_config
     @doc_name_index='000'
     @scanned_documents=Array.new
     @doc_name_prefix=File.join(Dir.tmpdir, "cdc_#{Time.now.strftime("%Y-%m-%d-%H%M%S")}_")
@@ -59,6 +62,9 @@ class Scanner
       sleep_count=0
 
       t=Thread.new do
+
+        check_program('empty-page');check_program('unpaper');check_program('convert')
+
 
         until @scann_converter_terminate do
           sleep 1; sleep_count=sleep_count+1

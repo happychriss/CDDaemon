@@ -2,15 +2,22 @@ require_relative '../lib/support'
 
 class Converter
 
+  attr_reader :daemon_config
+
   ### this part is running on the remove server (desktop) not on the qnas, should have convert and pdftotext installed
 
   include Support
+
+  def initialize(daemon_config)
+    @daemon_config=daemon_config
+  end
+
 
   def alive?
     true
   end
 
-  def run_conversion(data, mime_type,source)
+  def run_conversion(data, mime_type, source)
 
     begin
 
@@ -23,11 +30,19 @@ class Converter
 
       if [:PDF].include?(mime_type) then
 
-        check_program('convert'); check_program('abbyyocr')
+
+        check_program('convert');
         puts "------------ Start pdf convertion: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
         result_sjpg = convert_sjpg(fpath)
         result_jpg = convert_jpg(fpath)
+
+        ### Depending on configuration - start abbyocr or tesseract
+
+
+        puts "Using AbbyyOCR for OCR"
+
+        check_program('abbyyocr')
 
         puts "Start abbyyocr..."
         command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
@@ -35,17 +50,18 @@ class Converter
 
         result_txt = read_txt_from_conv_txt(fpath.untaint)
 
+
         puts "Read original file..."
 
         result_orginal=data
 
         puts "ok"
 
-      ### jpgs will be converted into PDF
+        ### jpgs will be converted into PDF
       elsif [:JPG].include?(mime_type) then
 
 
-        check_program('convert'); check_program('pdftotext'); check_program('abbyyocr')
+        check_program('convert'); check_program('pdftotext');
         puts "------------ Start conversion for jpg: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
 
@@ -55,32 +71,47 @@ class Converter
         result_sjpg = convert_sjpg(fopath)
         result_jpg = convert_jpg(fopath)
 
-        puts "Start abbyyocr..."
+        puts "***** START OCR with config: #{daemon_config.to_s}"
 
-        ## pfq 20, reduce quality to 20% if from scanner
+        if daemon_config[:ocr]==:abby then
 
-        if source==0 then #Source is scanner, reduce size
-          reduce='-pfq 20'
-          puts "Source is scanner, reduction with: #{reduce}"
+          puts "Start abbyyocr..."
+          check_program('abbyyocr')
 
-          command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
-          res = %x[#{command}]
+          ## pfq 20, reduce quality to 20% if from scanner
 
-          ## change size to normal a4
-          command="gs -o '#{fpath}.conv' -sDEVICE=pdfwrite  -dPDFFitPage -r300x300  -g2480x3508  '#{fpath}.big.conv'"
-          res = %x[#{command}]
+          if source==0 then #Source is scanner, reduce size
+            reduce='-pfq 20'
+            puts "Source is scanner, reduction with: #{reduce}"
+
+            command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
+            res = %x[#{command}]
+
+            ## change size to normal a4
+            command="gs -o '#{fpath}.conv' -sDEVICE=pdfwrite  -dPDFFitPage -r300x300  -g2480x3508  '#{fpath}.big.conv'"
+            res = %x[#{command}]
+          else
+            reduce='-pfpr original'
+            puts "Source is not scanner, dont reduce jpg with: #{reduce}"
+
+            command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
+            res = %x[#{command}]
+          end
+
         else
-          reduce='-pfpr original'
-          puts "Source is not scanner, dont reduce jpg with: #{reduce}"
 
-          command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
+          puts "Start tesseract..."
+          check_program('tesseract')
+
+          ## create outputfile with fixed name xxxx.conf.pdf - must be renamed
+          command="tesseract -l deu '#{fpath}' '#{fpath}.conv' pdf"
+          res = %x[#{command}]
+
+          command="mv '#{fpath}.conv.pdf' '#{fpath}.conv'"
           res = %x[#{command}]
         end
 
-
-
-
-        result_orginal=File.read(fpath.untaint+'.conv')   ## PDF return
+        result_orginal=File.read(fpath.untaint+'.conv') ## PDF return
 
         puts "ok with res: #{res}"
 
@@ -91,7 +122,7 @@ class Converter
 
       elsif [:MS_EXCEL, :MS_WORD, :ODF_CALC, :ODF_WRITER].include?(mime_type) then
 
-        tika_path=File.join(Dir.pwd,"lib","tika-app-1.4.jar")
+        tika_path=File.join(Dir.pwd, "lib", "tika-app-1.4.jar")
 
         check_program('convert'); check_program('html2ps'); check_program(tika_path) ##jar can be called directly
 
@@ -126,14 +157,14 @@ class Converter
       end
 
       puts "Clean-up with: #{fpath+'*'}..."
-                #### Cleanup and return
+      #### Cleanup and return
       Dir.glob(fpath+'*').each do |l|
         l.untaint
-       File.delete(l)
+        File.delete(l)
       end
       puts "ok"
       puts "--------- Completed and  file deleted------------"
-      return result_jpg, result_sjpg, result_orginal,result_txt, 'OK'
+      return result_jpg, result_sjpg, result_orginal, result_txt, 'OK'
 
     rescue Exception => e
       puts "Error:"+ e.message
