@@ -2,22 +2,41 @@ require_relative '../lib/support'
 
 class Converter
 
-  attr_reader :daemon_config
-
-  ### this part is running on the remove server (desktop) not on the qnas, should have convert and pdftotext installed
-
   include Support
 
-  def initialize(daemon_config)
-    @daemon_config=daemon_config
+  def initialize(web_server_uri)
+    @web_server_uri=web_server_uri
+    @ocr_abby_available=linux_program_exists?('abbyyocr')
+    @ocr_tesseract_available=linux_program_exists?('tesseract')
+    puts "********* Init Converter with: #{@web_server_uri} / Abby-OCR:#{@check_ocr_abby} / Tesseract-OCR:#{@check_ocr_tesseract}*******"
   end
 
 
-  def alive?
-    true
-  end
+  ################## Called from DRB ###################################################
 
   def run_conversion(data, mime_type, source)
+
+
+    t=Thread.new do
+
+      begin
+        convert_data(data, mime_type, source)
+      rescue => e
+        puts "************ ERROR *****: #{e.message}"
+        converter_status_update("ERROR:#{e.message}")
+        raise
+      end
+
+    end
+
+    t.abort_on_exception = true
+
+  end
+
+
+  ################ Do all the work #########################
+
+  def convert_data(data, mime_type, source)
 
     begin
 
@@ -28,38 +47,46 @@ class Converter
 
       puts "********* Start operation for mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
 
-      if [:PDF].include?(mime_type) then
+      result_txt=''
+      result_sjpg=nil
+      result_jpg=nil
+
+      ############################################################## PDF File ###############################################
+
+      if [:PDF].include?(mime_type)
 
 
-        check_program('convert');
+        check_program('convert')
         puts "------------ Start pdf convertion: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
+        converter_status_update("PDF: Create Preview")
         result_sjpg = convert_sjpg(fpath)
         result_jpg = convert_jpg(fpath)
 
-        ### Depending on configuration - start abbyocr or tesseract
+
+        ## only abby OCD supports PDF as input for OCR
+        if @ocr_abby_available then
+          converter_status_update("PDF: Abby-OCR Start")
+          check_program('abbyyocr')
+
+          puts "Start abbyyocr..."
+          command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
+          res = %x[#{command}]
+
+          result_txt = read_txt_from_conv_txt(fpath.untaint)
+
+          converter_status_update("PDF: Abby-OCR End")
+
+          #Read original file...
+          result_orginal=data
+
+          puts "ok"
+
+        end
 
 
-        puts "Using AbbyyOCR for OCR"
-
-        check_program('abbyyocr')
-
-        puts "Start abbyyocr..."
-        command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
-        res = %x[#{command}]
-
-        result_txt = read_txt_from_conv_txt(fpath.untaint)
-
-
-        puts "Read original file..."
-
-        result_orginal=data
-
-        puts "ok"
-
-        ### jpgs will be converted into PDF
+        ############################################################## JPG File ###############################################
       elsif [:JPG].include?(mime_type) then
-
 
         check_program('convert'); check_program('pdftotext');
         puts "------------ Start conversion for jpg: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
@@ -68,22 +95,23 @@ class Converter
         fopath=fpath+'.orient'
         res=%x[convert '#{fpath}'[0] -auto-orient jpg:'#{fopath}'] #convert only first page if more exists
 
+        converter_status_update("JPG: Create Preview Start")
         result_sjpg = convert_sjpg(fopath)
         result_jpg = convert_jpg(fopath)
+        converter_status_update("JPG: Create Preview End")
 
-        puts "***** START OCR with config: #{daemon_config.to_s}"
-
-        if daemon_config[:ocr]==:abby then
+        #### Use Abby if available ###########################
+        if @ocr_abby_available then
 
           puts "Start abbyyocr..."
           check_program('abbyyocr')
+          converter_status_update("JPG: Abby-OCR Start")
 
           ## pfq 20, reduce quality to 20% if from scanner
 
           if source==0 then #Source is scanner, reduce size
             reduce='-pfq 20'
             puts "Source is scanner, reduction with: #{reduce}"
-
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
             res = %x[#{command}]
 
@@ -97,11 +125,14 @@ class Converter
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
             res = %x[#{command}]
           end
+          converter_status_update("JPG: Abby-OCR End")
 
-        else
 
-          puts "Start tesseract..."
+        #### Use Abby if available ###########################
+        elsif @ocr_tesseract_available then
+
           check_program('tesseract')
+          converter_status_update("JPG: Tesser-OCR Start")
 
           ## create outputfile with fixed name xxxx.conf.pdf - must be renamed
           command="tesseract -l deu '#{fpath}' '#{fpath}.conv' pdf"
@@ -111,14 +142,20 @@ class Converter
           res = %x[#{command}]
         end
 
-        result_orginal=File.read(fpath.untaint+'.conv') ## PDF return
+        if @ocr_tesseract_available or @ocr_abby_available then
 
-        puts "ok with res: #{res}"
+          result_orginal=File.read(fpath.untaint+'.conv') ## PDF return
 
-        puts "Start pdftotxt..."
-        ## Extract text data and store in database
-        res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
-        result_txt = read_txt_from_conv_txt(fpath)
+          puts "ok with res: #{res}"
+
+          puts "Start pdftotxt..."
+          ## Extract text data and store in database
+          res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
+          result_txt = read_txt_from_conv_txt(fpath)
+
+        end
+
+############################################################## JPG File ###############################################
 
       elsif [:MS_EXCEL, :MS_WORD, :ODF_CALC, :ODF_WRITER].include?(mime_type) then
 
@@ -131,17 +168,20 @@ class Converter
         puts "------------ Start conversion for pdf or jpg: Source: '#{fpath}' ----------"
 
         ## Tika ############################### http://tika.apache.org/
-        puts "Start Tika Conversion..."
+
         command="#{tika_path} -h '#{fpath}' >> #{fpath+'.conv.html'}"
         res=%x[#{command}]
         puts "ok, Result: #{res}"
 
-        puts "Start converting to pre-jpg original size..."
-        res=%x[convert '#{fpath+'.conv.html'}'[0] jpg:'#{fpath+'.conv.tmp'}'] #convert only first page if more exists
-        puts "ok"
 
+        converter_status_update("OFFICE: Tika Start")
+        res=%x[convert '#{fpath+'.conv.html'}'[0] jpg:'#{fpath+'.conv.tmp'}'] #convert only first page if more exists
+        converter_status_update("OFFICE: Tika End")
+
+        converter_status_update("OFFICE: Preview Start")
         result_sjpg = convert_sjpg(fpath, '.conv.tmp')
         result_jpg = convert_jpg(fpath, '.conv.tmp')
+        converter_status_update("OFFICE: Preview End")
 
         ################ Extract Test from uploaded file
 
@@ -164,6 +204,7 @@ class Converter
       end
       puts "ok"
       puts "--------- Completed and  file deleted------------"
+
       return result_jpg, result_sjpg, result_orginal, result_txt, 'OK'
 
     rescue Exception => e
@@ -196,5 +237,11 @@ class Converter
     result_sjpg
   end
 
-  private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg
+  def converter_status_update(message)
+    puts "DRBCONVERTER: #{message}"
+    RestClient.post @web_server_uri+'/convert_status', {:message => message}, :content_type => :json, :accept => :json
+  end
+
+
+  private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update
 end

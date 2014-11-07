@@ -18,10 +18,11 @@ TEST=true
 def terminate(options, web_server_uri)
   ### if terminated, say goodby to the server
   puts "Stop DRB service for: #{options[:service]}"
-  RestClient.delete web_server_uri+"/connections/#{options[:uid]}", {:content_type => :json, :accept => :json}
+  RestClient.delete web_server_uri+"/connectors/#{options[:uid]}", {:content_type => :json, :accept => :json}
 
   sleep(1)
   DRb.stop_service
+  exit
 
 end
 
@@ -31,14 +32,8 @@ def run_drb_daemons(options)
 
   browser = DNSSD::Service.new
   services = {}
+  web_server_uri=''
 
-  #generacte Service Object, Scanner/Converter/Gpio
-
-  service_obj=Object.const_get(options[:service])
-  service_obj.new(options[:uid])
-
-  drb_uri=""
-  web_server_uri=""
 
   puts "Waiting for Service request for service: #{options[:service]}"
 
@@ -47,7 +42,7 @@ def run_drb_daemons(options)
     if reply.flags.add? then
       puts "Found Service: #{reply}"
 
-      if reply.name==options[:service] and services[reply.fullname].nil?
+      if reply.name=='Cleandesk' and services[reply.fullname].nil?
 
         services[reply.fullname] = reply
 
@@ -60,16 +55,19 @@ def run_drb_daemons(options)
           ## Create the uri of the web-server to sent confirmation, read from the service request
           web_server_uri="#{r.target}:#{r.port}"
 
+          #generate Service Object for DRB
+          service_obj=Object.const_get(options[:service]).new(web_server_uri)
+
           ### Start DRB Service
           puts "*** Starting Service:#{reply.fullname} on DRF: #{drb_uri} and connecting to: #{web_server_uri} ***"
 
           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
-          DRb.install_acl(acl)
+#          DRb.install_acl(acl)
           DRb.start_service(drb_uri, service_obj)
 
           ### Ancounce Service to Server
-          sleep(1)
-          RestClient.post web_server_uri+'/connections', {:connection => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
+          sleep(2)
+          RestClient.post web_server_uri+'/connectors', {:connector => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
 
           break unless r.flags.more_coming?
         end
@@ -89,6 +87,7 @@ def run_drb_daemons(options)
       puts "Lost Service: #{reply}"
       if not services[reply.fullname].nil?
         services.delete(reply.fullname)
+        DRb.stop_service
         puts "Disconnected from Service: #{reply.fullname}"
       end
     end
@@ -121,7 +120,7 @@ else
 
     $SAFE = 1 # disable eval() and friends
 
-    puts "In Daemons run_proc in remote mode on port 8999"
+    puts "In Daemons run_proc starting with options:#{options}"
 
     ### abbyocr is using getcwd when converting pdf to pdf,Daemons des set this to "/". This result in core dump. Setting the directoy helps
     Dir.chdir(Dir.tmpdir)

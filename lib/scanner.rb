@@ -5,21 +5,16 @@ class Scanner
 
   include Support
 
-  attr_reader :daemon_config
-
-  def me_alive?
-    true
-  end
-
-  def initialize(daemon_config)
-    @daemon_config=daemon_config
+  def initialize(web_server_uri)
+    @web_server_uri=web_server_uri
     @doc_name_index='000'
     @scanned_documents=Array.new
     @doc_name_prefix=File.join(Dir.tmpdir, "cdc_#{Time.now.strftime("%Y-%m-%d-%H%M%S")}_")
     @scann_converter_running=false
   end
 
-  ############## DRB Commands - Called from remote
+
+  ############## DRB Commands - Called from remote to list scann devices *********************************
 
   def scanner_list_devices
     puts "**List Devices**"
@@ -33,29 +28,40 @@ class Scanner
 
   end
 
-  def scanner_start_scann(device, color)
-    begin
-    scanner_status_update("Start for device #{device} and color: #{color}")
-    scann_command=scanner_build_command(device, color)
+  ### called via DRB to start scann process *************************************************************
 
-    ### File Conversion Thread
-    @convert_upload_thread=convert_upload_thread unless @scann_converter_running
+  def scanner_start_scann(device, color)
+
+    ## new thread needed to return to DRB call asap
+
+    t=Thread.new do
+
+      begin
+        scanner_status_update("Start for device #{device} and color: #{color}")
+        scann_command=scanner_build_command(device, color)
+
+        ### File Conversion Thread
+        @prepare_upload_thread=prepare_upload_thread unless @scann_converter_running
 
     result = %x[#{scann_command}] ############ HERE IS THE SCANNING
 
-    scanner_status_update("Ready:#{result}",true) ## true to say we are running to scan new data
+        scanner_status_update("Ready:#{result}",true) ## true to say we are running to scan new data
 
-    return result
-    rescue => e
-      puts "************ ERROR *****: #{e.message}"
-      raise
+      rescue => e
+        puts "************ ERROR *****: #{e.message}"
+        raise
+      end
+
     end
+
+    t.abort_on_exception = true
+
   end
 
 
 
 ######################################################################
-    def convert_upload_thread
+    def prepare_upload_thread
 
       @scann_converter_terminate=false
       @scann_converter_running=true
@@ -95,7 +101,7 @@ class Scanner
                 scanner_status_update("Upload to server")
                 @scanned_documents.push(f)
 
-                RestClient.post CD_SERVER+'/create_from_scanner_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb'), :source => 1}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
+                RestClient.post @web_server_uri+'/create_from_scanner_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb'), :source => 1}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
 
                 res4 = FileUtils.rm "#{f}.unpaper.ppm"
 
@@ -156,7 +162,7 @@ class Scanner
 
     def scanner_status_update(message,scan_complete=FALSE)
       puts "DRBSCANNER: #{message}"
-      RestClient.post CD_SERVER+'/scan_status', {:message => message, :scan_complete => scan_complete}, :content_type => :json, :accept => :json
+      RestClient.post @web_server_uri+'/scan_status', {:message => message, :scan_complete => scan_complete}, :content_type => :json, :accept => :json
     end
 
 
