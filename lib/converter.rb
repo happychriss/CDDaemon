@@ -14,29 +14,31 @@ class Converter
 
   ################## Called from DRB ###################################################
 
-  def run_conversion(data, mime_type, source)
+  def run_conversion(data, mime_type, source, page_id)
 
 
-    t=Thread.new do
+    begin
+      t=Thread.new do
 
-      begin
-        convert_data(data, mime_type, source)
-      rescue => e
-        puts "************ ERROR *****: #{e.message}"
-        converter_status_update("ERROR:#{e.message}")
-        raise
+        begin
+          convert_data(data, mime_type, source, page_id)
+        rescue => e
+          puts "************ ERROR *****: #{e.message}"
+          converter_status_update("ERROR:#{e.message}")
+          raise
+        end
+
       end
 
+      t.abort_on_exception = true
     end
-
-    t.abort_on_exception = true
 
   end
 
 
   ################ Do all the work #########################
 
-  def convert_data(data, mime_type, source)
+  def convert_data(data, mime_type, source, page_id)
 
     begin
 
@@ -45,7 +47,9 @@ class Converter
       f.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
       fpath=f.path #full path to the file to be processed
 
-      puts "********* Start operation for mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
+      puts "********* Start operation Page:#{page_id} / mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
+
+      converter_status_update("-")
 
       result_txt=''
       result_sjpg=nil
@@ -59,28 +63,23 @@ class Converter
         check_program('convert')
         puts "------------ Start pdf convertion: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
-        converter_status_update("PDF: Create Preview")
         result_sjpg = convert_sjpg(fpath)
         result_jpg = convert_jpg(fpath)
+        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
 
 
         ## only abby OCD supports PDF as input for OCR
         if @ocr_abby_available then
-          converter_status_update("PDF: Abby-OCR Start")
-          check_program('abbyyocr')
 
-          puts "Start abbyyocr..."
+          check_program('abbyyocr')
+          converter_status_update("PDF-Abby")
+
           command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
           res = %x[#{command}]
 
           result_txt = read_txt_from_conv_txt(fpath.untaint)
 
-          converter_status_update("PDF: Abby-OCR End")
-
-          #Read original file...
-          result_orginal=data
-
-          puts "ok"
+          converter_upload_text(result_txt, page_id)
 
         end
 
@@ -95,17 +94,15 @@ class Converter
         fopath=fpath+'.orient'
         res=%x[convert '#{fpath}'[0] -auto-orient jpg:'#{fopath}'] #convert only first page if more exists
 
-        converter_status_update("JPG: Create Preview Start")
         result_sjpg = convert_sjpg(fopath)
         result_jpg = convert_jpg(fopath)
-        converter_status_update("JPG: Create Preview End")
+        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
 
         #### Use Abby if available ###########################
         if @ocr_abby_available then
 
-          puts "Start abbyyocr..."
           check_program('abbyyocr')
-          converter_status_update("JPG: Abby-OCR Start")
+          converter_status_update("JPG-Abby")
 
           ## pfq 20, reduce quality to 20% if from scanner
 
@@ -125,14 +122,12 @@ class Converter
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
             res = %x[#{command}]
           end
-          converter_status_update("JPG: Abby-OCR End")
 
-
-        #### Use Abby if available ###########################
+          #### Use Abby if available ###########################
         elsif @ocr_tesseract_available then
 
           check_program('tesseract')
-          converter_status_update("JPG: Tesser-OCR Start")
+          converter_status_update("JPG-Tesser")
 
           ## create outputfile with fixed name xxxx.conf.pdf - must be renamed
           command="tesseract -l deu '#{fpath}' '#{fpath}.conv' pdf"
@@ -152,6 +147,7 @@ class Converter
           ## Extract text data and store in database
           res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
           result_txt = read_txt_from_conv_txt(fpath)
+          converter_upload_text(result_txt, page_id)
 
         end
 
@@ -174,14 +170,14 @@ class Converter
         puts "ok, Result: #{res}"
 
 
-        converter_status_update("OFFICE: Tika Start")
+        converter_status_update("Office-Tika")
         res=%x[convert '#{fpath+'.conv.html'}'[0] jpg:'#{fpath+'.conv.tmp'}'] #convert only first page if more exists
-        converter_status_update("OFFICE: Tika End")
 
-        converter_status_update("OFFICE: Preview Start")
+
         result_sjpg = convert_sjpg(fpath, '.conv.tmp')
         result_jpg = convert_jpg(fpath, '.conv.tmp')
-        converter_status_update("OFFICE: Preview End")
+
+        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
 
         ################ Extract Test from uploaded file
 
@@ -189,8 +185,7 @@ class Converter
         res=%x[#{tika_path} -t '#{fpath}' >> #{fpath+'.conv.txt'}]
 
         result_txt = read_txt_from_conv_txt(fpath)
-
-        result_orginal=data
+        converter_upload_text(result_txt, page_id)
 
       else
         raise "Unkonw mime -type  *#{mime_type}*"
@@ -204,8 +199,6 @@ class Converter
       end
       puts "ok"
       puts "--------- Completed and  file deleted------------"
-
-      return result_jpg, result_sjpg, result_orginal, result_txt, 'OK'
 
     rescue Exception => e
       puts "Error:"+ e.message
@@ -223,19 +216,36 @@ class Converter
 
   def convert_jpg(fpath, source_extension='')
     puts "Start converting to jpg..."
-    res=%x[convert '#{fpath+source_extension}'[0]   -flatten -resize x770 jpg:'#{fpath+'.conv'}'] #convert only first page if more exists
-    result_jpg=File.read(fpath+'.conv')
+    res=%x[convert '#{fpath+source_extension}'[0]   -flatten -resize x770 jpg:'#{fpath+'.conv.jpg'}'] #convert only first page if more exists
+    result_jpg=File.open(fpath+'.conv.jpg')
     puts "ok"
     result_jpg
   end
 
   def convert_sjpg(fpath, source_extension='')
     puts "Start converting to sjpg..."
-    res=%x[convert '#{fpath+source_extension}'[0]  -flatten -resize 350x490\! jpg:'#{fpath+'.conv'}'] #convert only first page if more exists
-    result_sjpg=File.read(fpath+'.conv')
+    res=%x[convert '#{fpath+source_extension}'[0]  -flatten -resize 350x490\! jpg:'#{fpath+'.conv.sjpg'}'] #convert only first page if more exists
+    result_sjpg=File.open(fpath+'.conv.sjpg')
     puts "ok"
     result_sjpg
   end
+
+
+  ##################################### Upload back to server when completed
+
+  def converter_upload_jpgs(result_jpg, result_sjpg, org_data, page_id)
+    puts "*** Upload JPGS to #{@web_server_uri} via convert_upload_jpgs"
+    RestClient.post @web_server_uri+'/convert_upload_jpgs', {:page => {:result_sjpg => result_sjpg, :result_jpg => result_jpg, :org_data => org_data, :id => page_id}}, :content_type => :json, :accept => :json
+  end
+
+  def converter_upload_text(text, page_id)
+    puts "*** Upload text from PDF to #{@web_server_uri} via convert_upload_text"
+    RestClient.post @web_server_uri+'/convert_upload_text', {:page => {:content => text, :id => page_id}}, :content_type => :json, :accept => :json
+    converter_status_update("ok")
+  end
+
+
+  ##################################### Update Status
 
   def converter_status_update(message)
     puts "DRBCONVERTER: #{message}"
@@ -243,5 +253,5 @@ class Converter
   end
 
 
-  private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update
+    private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update, :converter_upload_jpgs, :converter_upload_text
 end

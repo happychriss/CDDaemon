@@ -101,7 +101,7 @@ class Scanner
                 scanner_status_update("Upload to server")
                 @scanned_documents.push(f)
 
-                RestClient.post @web_server_uri+'/create_from_scanner_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb'), :source => 1}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
+                RestClient.post @web_server_uri+'/create_from_scanner_jpg', {:page => {:upload_file => File.new(f+".converted.jpg", 'rb')}, :small_upload_file => File.new(f+".converted_small.jpg", 'rb')}, :content_type => :json, :accept => :json
 
                 res4 = FileUtils.rm "#{f}.unpaper.ppm"
 
