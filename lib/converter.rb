@@ -8,7 +8,7 @@ class Converter
     @web_server_uri=web_server_uri
     @ocr_abby_available=linux_program_exists?('abbyyocr')
     @ocr_tesseract_available=linux_program_exists?('tesseract')
-    puts "********* Init Converter with: #{@web_server_uri} / Abby-OCR:#{@check_ocr_abby} / Tesseract-OCR:#{@check_ocr_tesseract}*******"
+    puts "********* Init Converter with: #{@web_server_uri} / Abby-OCR:#{@ocr_abby_available} / Tesseract-OCR:#{@ocr_tesseract_available}*******"
   end
 
 

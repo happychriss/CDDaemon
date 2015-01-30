@@ -105,7 +105,7 @@ class Scanner
 
                 res4 = FileUtils.rm "#{f}.unpaper.ppm"
 
-                scanner_status_update(" #{@scanned_documents.count()} documents processed.")
+               scanner_status_update(" #{@scanned_documents.count()} documents processed.")
 
               end
             end
