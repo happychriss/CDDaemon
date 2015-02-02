@@ -61,9 +61,20 @@ def run_drb_daemons(options)
           ### Start DRB Service
           puts "*** Starting Service:#{reply.fullname} on DRF: #{drb_uri} and connecting to: #{web_server_uri} ***"
 
-          acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
-#          DRb.install_acl(acl)
+          #acl = ACL.new(["allow", "all"])
+#           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
+
+          acl = ACL.new(%w(allow all
+                           allow 10.237.48.*
+                           allow localhost))
+
+          DRb.install_acl(acl)
+
+
           DRb.start_service(drb_uri, service_obj)
+
+
+          DRb.uri
 
           ### Ancounce Service to Server
           sleep(2)

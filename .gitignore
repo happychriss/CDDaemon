@@ -78,3 +78,6 @@ app/jobs/cd_drb_worker.pid
 **.orig
 
 
+
+.ruby-gemset
+.ruby-version
