@@ -88,13 +88,16 @@ class Scanner
 
               if @scanned_documents.index(f).nil?
                 scanner_status_update("Cleaning")
+		puts "Start unpaper"
 
-                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --sheet-size a4 --no-grayfilter --no-mask-scan --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
                 raise "Error unpaper - #{res1}" unless res1[0..10] == "unpaper 0.4"
 
+		puts "Start convert"
                 res2 = %x[convert '#{f}.unpaper.ppm' '#{f}.converted.jpg']
                 raise "Error convert - #{res2}" unless res2==''
 
+		puts "Start convert to small image"
                 res3 = %x[convert '#{f}.converted.jpg' -resize 350x490\! jpg:'#{f}.converted_small.jpg']
                 raise "Error convert - #{res3}" unless res3==''
 
