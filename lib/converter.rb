@@ -4,7 +4,7 @@ class Converter
 
   include Support
 
-  def initialize(web_server_uri)
+  def initialize(web_server_uri,options)
     @web_server_uri=web_server_uri
     @ocr_abby_available=linux_program_exists?('abbyyocr')
     @ocr_tesseract_available=linux_program_exists?('tesseract')

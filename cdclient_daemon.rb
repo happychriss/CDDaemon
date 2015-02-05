@@ -56,7 +56,7 @@ def run_drb_daemons(options)
           web_server_uri="#{r.target}:#{r.port}"
 
           #generate Service Object for DRB
-          service_obj=Object.const_get(options[:service]).new(web_server_uri)
+          service_obj=Object.const_get(options[:service]).new(web_server_uri,options)
 
           ### Start DRB Service
           puts "*** Starting Service:#{reply.fullname} on DRF: #{drb_uri} and connecting to: #{web_server_uri} and subnet: #{options[:subnet]} ***"
@@ -140,6 +140,10 @@ OptionParser.new do |opts|
   opts.on('-n', '--subnet SUBNET', 'Subnet ACL, e.g. 192.168.1.*') { |v| options[:subnet] = v }
   opts.on('-p', '--port PORT', 'Port where the DRB-Service is offered, sent to the server') { |v| options[:port] = v }
   opts.on('-f', '--avahiprefix PREFIX_AVAHI', 'Avahi Search Prefix') { |v| options[:avahi_prefix] = v }
+
+  ### option for scanner only
+  opts.on('-i', '--unpaper_speed SPEED', 'Unpaper speed (y/n)') { |v| options[:unpaper_speed] = v }
+
 end.parse!
 
 

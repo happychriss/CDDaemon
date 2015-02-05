@@ -5,12 +5,13 @@ class Scanner
 
   include Support
 
-  def initialize(web_server_uri)
+  def initialize(web_server_uri,options)
     @web_server_uri=web_server_uri
     @doc_name_index='000'
     @scanned_documents=Array.new
     @doc_name_prefix=File.join(Dir.tmpdir, "cdc_#{Time.now.strftime("%Y-%m-%d-%H%M%S")}_")
     @scann_converter_running=false
+    @unpaper_speed=options[:unpaper_speed]=='y'
   end
 
 
@@ -88,16 +89,23 @@ class Scanner
 
               if @scanned_documents.index(f).nil?
                 scanner_status_update("Cleaning")
-		puts "Start unpaper"
 
-                res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --sheet-size a4 --no-grayfilter --no-mask-scan --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                puts "Start unpaper with speed-option: #{@unpaper_speed.to_s}"
+
+                if @unpaper_speed then
+                  ### quick version for unpaper, not using --no-mask-scan
+                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --sheet-size a4 --no-grayfilter --no-mask-scan --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                else
+                  res1 = %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  --pre-border 0,200,0,0 '#{f_scanned_ppm}' '#{f}.unpaper.ppm']
+                end
+
                 raise "Error unpaper - #{res1}" unless res1[0..10] == "unpaper 0.4"
 
-		puts "Start convert"
+            		puts "Start convert"
                 res2 = %x[convert '#{f}.unpaper.ppm' '#{f}.converted.jpg']
                 raise "Error convert - #{res2}" unless res2==''
 
-		puts "Start convert to small image"
+		            puts "Start convert to small image"
                 res3 = %x[convert '#{f}.converted.jpg' -resize 350x490\! jpg:'#{f}.converted_small.jpg']
                 raise "Error convert - #{res3}" unless res3==''
 
