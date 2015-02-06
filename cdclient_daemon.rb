@@ -65,7 +65,7 @@ def run_drb_daemons(options)
           #           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
 
           acl = ACL.new(%W(deny all
-                           allow #{options[:subnet]}
+                           allow #{options[:subnet]}.*
                            allow localhost))
 
           DRb.install_acl(acl)
