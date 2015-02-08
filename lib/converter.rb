@@ -79,7 +79,7 @@ class Converter
 
           result_txt = read_txt_from_conv_txt(fpath.untaint)
 
-          converter_upload_text(result_txt, page_id)
+          converter_upload_pdf(result_txt,nil, page_id)
 
         end
 
@@ -139,7 +139,8 @@ class Converter
 
         if @ocr_tesseract_available or @ocr_abby_available then
 
-          result_orginal=File.read(fpath.untaint+'.conv') ## PDF return
+
+          result_orginal=File.open(fpath+'.conv') ## PDF return
 
           puts "ok with res: #{res}"
 
@@ -147,7 +148,7 @@ class Converter
           ## Extract text data and store in database
           res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
           result_txt = read_txt_from_conv_txt(fpath)
-          converter_upload_text(result_txt, page_id)
+          converter_upload_pdf(result_txt,result_orginal, page_id)
 
         end
 
@@ -185,7 +186,7 @@ class Converter
         res=%x[#{tika_path} -t '#{fpath}' >> #{fpath+'.conv.txt'}]
 
         result_txt = read_txt_from_conv_txt(fpath)
-        converter_upload_text(result_txt, page_id)
+        converter_upload_pdf(result_txt, nil, page_id)
 
       else
         raise "Unkonw mime -type  *#{mime_type}*"
@@ -238,9 +239,9 @@ class Converter
     RestClient.post @web_server_uri+'/convert_upload_jpgs', {:page => {:result_sjpg => result_sjpg, :result_jpg => result_jpg, :org_data => org_data, :id => page_id}}, :content_type => :json, :accept => :json
   end
 
-  def converter_upload_text(text, page_id)
-    puts "*** Upload text from PDF to #{@web_server_uri} via convert_upload_text"
-    RestClient.post @web_server_uri+'/convert_upload_text', {:page => {:content => text, :id => page_id}}, :content_type => :json, :accept => :json
+  def converter_upload_pdf(text,pdf_data,page_id)
+    puts "*** Upload text from PDF to #{@web_server_uri} via convert_upload_pdf"
+    RestClient.post @web_server_uri+'/convert_upload_pdf', {:page => {:content => text,:pdf_data => pdf_data, :id => page_id}}, :content_type => :json, :accept => :json
     converter_status_update("ok")
   end
 
@@ -253,5 +254,5 @@ class Converter
   end
 
 
-    private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update, :converter_upload_jpgs, :converter_upload_text
+    private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update, :converter_upload_jpgs, :converter_upload_pdf
 end

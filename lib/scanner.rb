@@ -75,8 +75,7 @@ class Scanner
 
         until @scann_converter_terminate do
           sleep 1; sleep_count=sleep_count+1
-          if sleep_count>50 then
-            puts "***********ERROR - Scann took to long"
+          if sleep_count>150 then
             @scann_converter_terminate=true
           end
 
