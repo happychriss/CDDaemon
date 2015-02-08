@@ -79,7 +79,7 @@ def run_drb_daemons(options)
           ### Ancounce Service to Server by sending a post request
           ### trying it several times, as avahi service may be up and running before web-server is ready
 
-          try_counter=0; try_max=20
+          try_counter=0; try_max=1
 
           loop do
             begin
