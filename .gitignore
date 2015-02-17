@@ -9,6 +9,8 @@ db/sphinx/*
 verbose/*
 .idea/*
 vendor/*
+cdscanner.log
+gpio_server.log
 
 ## Application Specific
 public/docstore/*

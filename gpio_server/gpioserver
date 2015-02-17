@@ -18,9 +18,9 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 
 DAEMON=//home/cds/.rvm/bin/bootup_gpio_server.rb
 
-DAEMON_HOME=//home/cds/CDServer
-DAEMON_LOG=$DAEMON_HOME/log/gpio_server.log
-DAEMON_OPTS="-e production -p 8970"
+DAEMON_HOME=//home/cds/CDDaemon
+DAEMON_LOG=$DAEMON_HOME/gpio_server.log
+DAEMON_OPTS="-s 10.237.48 -p 8970"
 PID=/run/cpioserver.pid
 VERBOSE="y"
 
