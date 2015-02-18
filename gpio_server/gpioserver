@@ -20,13 +20,10 @@ DAEMON=//home/cds/.rvm/bin/bootup_gpio_server.rb
 
 DAEMON_HOME=//home/cds/CDDaemon
 DAEMON_LOG=$DAEMON_HOME/gpio_server.log
-DAEMON_OPTS="-s 10.237.48 -p 8970"
+DAEMON_OPTS="start -- --subnet 10.237.48 --port 8970"
 PID=/run/cpioserver.pid
 VERBOSE="y"
 
-
-. /lib/init/vars.sh
-. /lib/lsb/init-functions
 
 #
 # Function that starts the daemon/service
@@ -37,8 +34,7 @@ VERBOSE="y"
 # 2 if daemon could not be started
 do_start()
 {
-    start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON --test > /dev/null || return 1
-    start-stop-daemon --start --quiet --pidfile $PID --exec $DAEMON -- $DAEMON_OPTS 2>$DAEMON_LOG || return 2
+	$DAEMON start $DAEMON_OPTS  2>/dev/null || return 2
 }
 #
 # Function that stops the daemon/service
@@ -60,16 +56,16 @@ start)
     [ "$VERBOSE" != no ] && echo "Starting $DESC" "$NAME"
     do_start
     case "$?" in
-    0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-    2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+    0|1) [ "$VERBOSE" != no ] && echo 0 ;;
+    2) [ "$VERBOSE" != no ] && echo 1 ;;
 esac
 ;;
 stop)
     [ "$VERBOSE" != no ] && echo "Stopping $DESC" "$NAME"
     do_stop
     case "$?" in
-    0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-    2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+    0|1) [ "$VERBOSE" != no ] && echo 0 ;;
+    2) [ "$VERBOSE" != no ] && echo 1 ;;
 esac
 ;;
 restart)
