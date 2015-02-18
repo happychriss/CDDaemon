@@ -1,6 +1,5 @@
 ###  Server Daemon to convert data on a more performant server - called via distributed ruby DRB
 require 'rubygems' # if you use RubyGems
-require 'daemons'
 require 'drb'
 require 'drb/acl'
 require 'tempfile'
@@ -146,20 +145,4 @@ OptionParser.new do |opts|
 
 end.parse!
 
-
-if TRUE then
-  run_drb_daemons(options)
-else
-  Daemons.run_proc("DRbProcessorRemoveServer.rb", options = {:dir_mode => :normal, :ARGV => ARGV, :log_output => true, :on_top => true}) do
-
-    $SAFE = 1 # disable eval() and friends
-
-    puts "In Daemons run_proc starting with options:#{options}"
-
-    ### abbyocr is using getcwd when converting pdf to pdf,Daemons des set this to "/". This result in core dump. Setting the directoy helps
-    Dir.chdir(Dir.tmpdir)
-    puts "Current Dir: "+Dir.pwd
-
-    run_drb_daemons(options)
-  end
-end
+run_drb_daemons(options)

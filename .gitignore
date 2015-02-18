@@ -83,3 +83,4 @@ app/jobs/cd_drb_worker.pid
 
 .ruby-gemset
 .ruby-version
+gpio_server/gpio_server.pid

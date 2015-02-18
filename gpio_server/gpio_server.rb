@@ -7,80 +7,65 @@ require 'daemons'
 require 'optparse'
 
 
-class gpio_app
+class GpioApp
 
-def initialize(args)
-	super(self.class)
-	@options = OpenStruct.new(:daemonize => true)
-	opts = OptionParser.new do |opts|
-	opts.banner = 'Usage: myapp [options]'
-	opts.separator ''
-	opts.on('-N', '--no-daemonize', "Don't run as a daemon") do
-	@options.daemonize = false
-end
-end
-@args = opts.parse!(args)
-end
+  def initialize(args)
 
-end
+    @port=0
+    @subnet=''
 
-	########## Start DRB-SERVER ####################################################
+    @args_daemon=args[0] # arguments for the contolling daemon / start / stop
 
-	puts options
+    args.shift(2) ## remove daemon options
+    OptionParser.new do |opts|
+      opts.on('-p', '--port PORT', "DRB Port to listen") { |v| @port = v }
+      opts.on('-s', '--subnet SUBNET', "Access List ACL") { |v| @subnet = v }
+    end.parse(args)
 
-	port=options[:port]
-	subnet=options[:subnet]
+  end
 
-	drb_uri="druby://localhost:#{port}"
-	#URI='druby://10.237.48.91:8780'
-
-	puts "****** Start DRB Gpio-Server on #{drb_uri}*** for subnet #{subnet}"
+  def run
 
 
-	 list = %W[
+    Daemons.run_proc("gpio_server",:ARGV => [@args_daemon],:log_output => true) do
+
+    ########## Start DRB-SERVER ####################################################
+
+
+    drb_uri="druby://localhost:#{@port}"
+    #URI='druby://10.237.48.91:8780'
+
+    puts "****** Start DRB Gpio-Server on #{drb_uri}*** for subnet #{@subnet}"
+
+
+    list = %W[
 		  deny all
 		  allow localhost
-		  allow #{subnet}.*
+		  allow #{@subnet}.*
 	]
 
-	acl = ACL.new(list, ACL::DENY_ALLOW)
-	DRb.install_acl(acl)
+    acl = ACL.new(list, ACL::DENY_ALLOW)
+
+    front_object=SunxiServer::DRB_PinFactory.new
+
+    DRb.install_acl(acl)
+
+    DRb.start_service(drb_uri, front_object)
+
+    puts "Service started"
+
+    sleep
+
+    # Wait for the drb server thread to finish before exiting.
+      end
+  end
 
 
-	front_object=SunxiServer::DRB_PinFactory.new
-	$SAFE = 1 # disable eval() and friends
-	DRb.start_service(drb_uri, front_object)
 
-	puts "Service started"
-
-	# Wait for the drb server thread to finish before exiting.
 end
-
 
 #############################################################################################
 
+gpio_app=GpioApp.new(ARGV)
+gpio_app.run
 
-
-Daemons.run_proc("DRbGpio.rb", options = {:ARGV => ARGV, :log_output => true, :log_dir => '//home/cds/CDDaemon/gpio_server' }) do
-
-
-doptions = {}
-
-parser=OptionParser.new do |opts|
-  opts.banner = "Usage: cdcclient_daemon.rb [options]"
-  opts.on('-n', '--subnet SUBNET', 'Subnet ACL, e.g. 192.168.1.*') { |v| doptions[:subnet] = v }
-  opts.on('-p', '--port PORT', 'Port where the DRB-Service is offered, sent to the server') { |v| doptions[:port] = v }
-end
-
-
-
-puts "my options: #{ARGV}"
-puts "my doptions: #{doptions}"
-
-$SAFE = 1 # disable eval() and friends
-
-puts "In Daemons run_proc starting with options:#{doptions}"
-
-run_drb_daemons(doptions)
-
-end
