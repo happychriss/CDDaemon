@@ -13,6 +13,8 @@ class GpioApp
 
     @port=0
     @subnet=''
+    @logdir=''
+
 
     @args_daemon=args[0] # arguments for the contolling daemon / start / stop
 
@@ -20,6 +22,7 @@ class GpioApp
     OptionParser.new do |opts|
       opts.on('-p', '--port PORT', "DRB Port to listen") { |v| @port = v }
       opts.on('-s', '--subnet SUBNET', "Access List ACL") { |v| @subnet = v }
+      opts.on('-l', '--logdir LOGDIR', "absolut path to log folder") { |v| @logdir = v }
     end.parse(args)
 
   end
@@ -27,36 +30,30 @@ class GpioApp
   def run
 
 
-    Daemons.run_proc("gpio_server",:ARGV => [@args_daemon],:log_output => true) do
+    Daemons.run_proc("gpio_server",:ARGV => [@args_daemon],:log_output => true, :log_dir => @logdir) do
 
     ########## Start DRB-SERVER ####################################################
 
 
-    drb_uri="druby://localhost:#{@port}"
-    #URI='druby://10.237.48.91:8780'
+    drb_uri="druby://#{Socket.gethostname}:#{@port}"    #URI='druby://10.237.48.91:8780'
 
-    puts "****** Start DRB Gpio-Server on #{drb_uri}*** for subnet #{@subnet}"
+    puts "****** Start DRB Gpio-Server on #{drb_uri}*** for Subnet #{@subnet}"
 
-
-    list = %W[
-		  deny all
-		  allow localhost
-		  allow #{@subnet}.*
-	]
-
-    acl = ACL.new(list, ACL::DENY_ALLOW)
-
-    front_object=SunxiServer::DRB_PinFactory.new
+    acl = ACL.new(%W(deny all
+  		      allow #{@subnet}.*
+                      allow localhost))
 
     DRb.install_acl(acl)
 
+    front_object=SunxiServer::DRB_PinFactory.new
+   
     DRb.start_service(drb_uri, front_object)
 
-    puts "Service started"
+    puts "Service started: #{DRb.uri}"
 
-    sleep
+   # Wait for the drb server thread to finish before exiting.
+     DRb.thread.join
 
-    # Wait for the drb server thread to finish before exiting.
       end
   end
 

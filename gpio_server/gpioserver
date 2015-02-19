@@ -14,16 +14,18 @@
 DESC="gpioserver for CT io controll"
 NAME=gpio_server
 
-PATH=/sbin:/usr/sbin:/bin:/usr/bin
-
-DAEMON=//home/cds/.rvm/bin/bootup_gpio_server.rb
-
+#### Parameter ###############################
 DAEMON_HOME=//home/cds/CDDaemon
-DAEMON_LOG=$DAEMON_HOME/gpio_server.log
-DAEMON_OPTS="start -- --subnet 10.237.48 --port 8970"
-PID=/run/cpioserver.pid
+DAEMON_LOG=$DAEMON_HOME
+DAEMON_PORT=8780
+DAEMON_ACL="10.237.48"
 VERBOSE="y"
 
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DAEMON=//home/cds/.rvm/bin/bootup_gpio_server.rb
+DAEMON_OPTS=" -- --subnet $DAEMON_ACL --port $DAEMON_PORT"
+DAEMON_LOG_OPT="--logdir $DAEMON_LOG"
 
 #
 # Function that starts the daemon/service
@@ -34,7 +36,7 @@ VERBOSE="y"
 # 2 if daemon could not be started
 do_start()
 {
-	$DAEMON start $DAEMON_OPTS  2>/dev/null || return 2
+	$DAEMON start $DAEMON_OPTS $DAEMON_LOG_OPT  2>/dev/null || return 2
 }
 #
 # Function that stops the daemon/service
@@ -46,11 +48,12 @@ do_start()
 # other if a failure occurred
 do_stop()
 {
-    start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PID --name $NAME
+    $DAEMON stop
     RETVAL="$?"
     sleep 1
     return "$RETVAL"
 }
+
 case "$1" in
 start)
     [ "$VERBOSE" != no ] && echo "Starting $DESC" "$NAME"
