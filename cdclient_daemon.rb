@@ -9,7 +9,10 @@ require 'socket'
 
 require_relative './lib/converter'
 require_relative './lib/scanner'
+require_relative './lib/iocontroller'
+
 require_relative './lib/support'
+
 
 TEST=true
 
@@ -58,7 +61,7 @@ def run_drb_daemons(options)
           service_obj=Object.const_get(options[:service]).new(web_server_uri,options)
 
           ### Start DRB Service
-          puts "*** Starting Service:#{reply.fullname} on DRF: #{drb_uri} and connecting to: #{web_server_uri} and subnet: #{options[:subnet]} ***"
+          puts "*** Responding to Avahi #{reply.fullname} Providing service for: #{web_server_uri} via DRB: #{drb_uri} and  and subnet: #{options[:subnet]} ***"
 
           #acl = ACL.new(["allow", "all"])
           #           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
@@ -142,6 +145,11 @@ OptionParser.new do |opts|
 
   ### option for scanner only
   opts.on('-i', '--unpaper_speed SPEED', 'Unpaper speed (y/n)') { |v| options[:unpaper_speed] = v }
+
+
+  ### option for gpioserver only, used by iocontroller to connect to gpio_server
+  opts.on('-g', '--gpio_port PORT', 'Port of the gpio_server to connect to') { |v| options[:gpio_port] = v }
+  opts.on('-h', '--gpio_server SERVER', 'Server of the gpio_server to connect to') { |v| options[:gpio_server] = v }
 
 end.parse!
 
