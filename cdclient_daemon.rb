@@ -9,7 +9,7 @@ require 'socket'
 
 require_relative './lib/converter'
 require_relative './lib/scanner'
-require_relative './lib/iocontroller'
+require_relative './lib/hardware'
 
 require_relative './lib/support'
 
@@ -147,7 +147,7 @@ OptionParser.new do |opts|
   opts.on('-i', '--unpaper_speed SPEED', 'Unpaper speed (y/n)') { |v| options[:unpaper_speed] = v }
 
 
-  ### option for gpioserver only, used by iocontroller to connect to gpio_server
+  ### option for gpioserver only, used by hardwares system to connect to gpio_server
   opts.on('-g', '--gpio_port PORT', 'Port of the gpio_server to connect to') { |v| options[:gpio_port] = v }
   opts.on('-h', '--gpio_server SERVER', 'Server of the gpio_server to connect to') { |v| options[:gpio_server] = v }
 
