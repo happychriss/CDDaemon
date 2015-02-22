@@ -42,12 +42,12 @@ class Converter
 
     begin
 
-      f = Tempfile.new("cd2_remote")
-      f.write(data)
-      f.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
-      fpath=f.path #full path to the file to be processed
+      f_data = Tempfile.new("cd2_remote")
+      f_data.write(data)
+      f_data.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
+      fpath=f_data.path #full path to the file to be processed
 
-      puts "********* Start operation Page:#{page_id} / mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{f.path} in folder #{Dir.pwd}*************"
+      puts "********* Start operation Page:#{page_id} / mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{fpath} in folder #{Dir.pwd}*************"
 
       converter_status_update("-")
 
@@ -65,7 +65,7 @@ class Converter
 
         result_sjpg = convert_sjpg(fpath)
         result_jpg = convert_jpg(fpath)
-        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
+        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
 
 
         ## only abby OCD supports PDF as input for OCR
@@ -96,7 +96,7 @@ class Converter
 
         result_sjpg = convert_sjpg(fopath)
         result_jpg = convert_jpg(fopath)
-        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
+        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
 
         #### Use Abby if available ###########################
         if @ocr_abby_available then
@@ -178,7 +178,7 @@ class Converter
         result_sjpg = convert_sjpg(fpath, '.conv.tmp')
         result_jpg = convert_jpg(fpath, '.conv.tmp')
 
-        converter_upload_jpgs(result_jpg, result_sjpg, data, page_id)
+        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
 
         ################ Extract Test from uploaded file
 
