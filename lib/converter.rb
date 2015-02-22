@@ -2,6 +2,9 @@ require_relative '../lib/support'
 
 class Converter
 
+
+  SOURCE_SCANNER=0
+
   include Support
 
   def initialize(web_server_uri,options)
@@ -9,19 +12,20 @@ class Converter
     @ocr_abby_available=linux_program_exists?('abbyyocr')
     @ocr_tesseract_available=linux_program_exists?('tesseract')
     puts "********* Init Converter with: #{@web_server_uri} / Abby-OCR:#{@ocr_abby_available} / Tesseract-OCR:#{@ocr_tesseract_available}*******"
+    @unpaper_speed=options[:unpaper_speed]=='y'
   end
 
 
   ################## Called from DRB ###################################################
 
-  def run_conversion(data, mime_type, source, page_id)
+  def run_conversion(data_jpg, mime_type, source, page_id)
 
 
     begin
       t=Thread.new do
 
         begin
-          convert_data(data, mime_type, source, page_id)
+          convert_data(data_jpg, mime_type, source, page_id)
         rescue => e
           puts "************ ERROR *****: #{e.message}"
           converter_status_update("ERROR:#{e.message}")
@@ -38,14 +42,14 @@ class Converter
 
   ################ Do all the work #########################
 
-  def convert_data(data, mime_type, source, page_id)
+  def convert_data(data_jpg, mime_type, source, page_id)
 
     begin
 
-      f_data = Tempfile.new("cd2_remote")
-      f_data.write(data)
-      f_data.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
-      fpath=f_data.path #full path to the file to be processed
+      f_org = Tempfile.new("cd2_remote")
+      f_org.write(data_jpg)
+      f_org.untaint #avoid ruby insecure operation: http://stackoverflow.com/questions/12165664/what-are-the-rubys-objecttaint-and-objecttrust-methods
+      fpath=f_org.path #full path to the file to be processed
 
       puts "********* Start operation Page:#{page_id} / mime_type: #{mime_type.to_s} / source: #{source.to_s} and tempfile #{fpath} in folder #{Dir.pwd}*************"
 
@@ -56,6 +60,7 @@ class Converter
       result_jpg=nil
 
       ############################################################## PDF File ###############################################
+      ### create preview images, scan pdf for text
 
       if [:PDF].include?(mime_type)
 
@@ -65,7 +70,8 @@ class Converter
 
         result_sjpg = convert_sjpg(fpath)
         result_jpg = convert_jpg(fpath)
-        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
+
+        converter_upload_jpgs(result_jpg, result_sjpg, page_id)
 
 
         ## only abby OCD supports PDF as input for OCR
@@ -85,18 +91,27 @@ class Converter
 
 
         ############################################################## JPG File ###############################################
+        ### create PDF, scann for text
+
       elsif [:JPG].include?(mime_type) then
 
-        check_program('convert'); check_program('pdftotext');
+        check_program('convert'); check_program('pdftotext'); check_program('unpaper');check_program('gs')
         puts "------------ Start conversion for jpg: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
+        #### Run additional unpaper from orignal file, if not the speed option is selected
+        if source==SOURCE_SCANNER  and not @unpaper_speed
+          puts "Source: Scanner without speed option - run additional unpaper..."
+          res=%x[convert '#{fpath}'[0] '#{fpath}.ppm'] #convert only first page if more exists
+          %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  --pre-border 0,200,0,0 '#{fpath}.ppm' '#{fpath}.unpaper']
+          %x[convert '#{fpath}.unpaper' jpg:'#{fpath}']
+        end
 
         fopath=fpath+'.orient'
         res=%x[convert '#{fpath}'[0] -auto-orient jpg:'#{fopath}'] #convert only first page if more exists
 
         result_sjpg = convert_sjpg(fopath)
         result_jpg = convert_jpg(fopath)
-        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
+        converter_upload_jpgs(result_jpg, result_sjpg, page_id)
 
         #### Use Abby if available ###########################
         if @ocr_abby_available then
@@ -106,7 +121,7 @@ class Converter
 
           ## pfq 20, reduce quality to 20% if from scanner
 
-          if source==0 then #Source is scanner, reduce size
+          if source==SOURCE_SCANNER then #Source is scanner, reduce size
             reduce='-pfq 20'
             puts "Source is scanner, reduction with: #{reduce}"
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
@@ -139,8 +154,12 @@ class Converter
 
         if @ocr_tesseract_available or @ocr_abby_available then
 
-
-          result_orginal=File.open(fpath+'.conv') ## PDF return
+          #### jpg immages are stored as jpge images in the system
+          if source==SOURCE_SCANNER
+            result_new_pdf=File.open(fpath+'.conv') ## PDF return
+          else
+            result_new_pdf=nil
+            end
 
           puts "ok with res: #{res}"
 
@@ -148,7 +167,7 @@ class Converter
           ## Extract text data and store in database
           res=%x[pdftotext -layout '#{fpath+'.conv'}' #{fpath+'.conv.txt'}]
           result_txt = read_txt_from_conv_txt(fpath)
-          converter_upload_pdf(result_txt,result_orginal, page_id)
+          converter_upload_pdf(result_txt,result_new_pdf, page_id)
 
         end
 
@@ -178,7 +197,7 @@ class Converter
         result_sjpg = convert_sjpg(fpath, '.conv.tmp')
         result_jpg = convert_jpg(fpath, '.conv.tmp')
 
-        converter_upload_jpgs(result_jpg, result_sjpg, f_data, page_id)
+        converter_upload_jpgs(result_jpg, result_sjpg, page_id)
 
         ################ Extract Test from uploaded file
 
@@ -234,9 +253,9 @@ class Converter
 
   ##################################### Upload back to server when completed
 
-  def converter_upload_jpgs(result_jpg, result_sjpg, org_data, page_id)
+  def converter_upload_jpgs(result_jpg, result_sjpg, page_id)
     puts "*** Upload JPGS to #{@web_server_uri} via convert_upload_jpgs"
-    RestClient.post @web_server_uri+'/convert_upload_jpgs', {:page => {:result_sjpg => result_sjpg, :result_jpg => result_jpg, :org_data => org_data, :id => page_id}}, :content_type => :json, :accept => :json
+    RestClient.post @web_server_uri+'/convert_upload_jpgs', {:page => {:result_sjpg => result_sjpg, :result_jpg => result_jpg, :id => page_id}}, :content_type => :json, :accept => :json
   end
 
   def converter_upload_pdf(text,pdf_data,page_id)
