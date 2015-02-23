@@ -36,7 +36,6 @@ def run_drb_daemons(options)
   services = {}
   web_server_uri=''
 
-
   puts "Waiting for Service request for service: #{options[:service]} with prefix: #{options[:avahi_prefix]}"
 
   browser.browse '_cds._tcp' do |reply|
@@ -56,6 +55,7 @@ def run_drb_daemons(options)
 
           ## Create the uri of the web-server to sent confirmation, read from the service request
           web_server_uri="#{r.target}:#{r.port}"
+
 
           #generate Service Object for DRB
           service_obj=Object.const_get(options[:service]).new(web_server_uri,options)
@@ -81,7 +81,7 @@ def run_drb_daemons(options)
           ### Ancounce Service to Server by sending a post request
           ### trying it several times, as avahi service may be up and running before web-server is ready
 
-          try_counter=0; try_max=1
+          try_counter=0; try_max=5
 
           loop do
             begin
@@ -116,10 +116,18 @@ def run_drb_daemons(options)
 
     else
       puts "Lost Service: #{reply}"
-      if not services[reply.fullname].nil?
-        services.delete(reply.fullname)
-        DRb.stop_service
-        puts "Disconnected from Service: #{reply.fullname}"
+      unless  services[reply.fullname].nil?
+
+        ## check if server is down or just a short avahi problem (lost connection)
+
+        begin
+          result=RestClient.get web_server_uri+'/get_server_status'
+        rescue => e
+          services.delete(reply.fullname)
+          DRb.stop_service
+          puts "Disconnected from Service: #{reply.fullname}"
+        end
+
       end
     end
 
