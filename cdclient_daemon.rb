@@ -29,6 +29,8 @@ def terminate(options, web_server_uri)
 end
 
 
+
+
 def run_drb_daemons(options)
 
 
@@ -61,7 +63,7 @@ def run_drb_daemons(options)
           service_obj=Object.const_get(options[:service]).new(web_server_uri,options)
 
           ### Start DRB Service
-          puts "*** Responding to Avahi #{reply.fullname} Providing service for: #{web_server_uri} via DRB: #{drb_uri} and  and subnet: #{options[:subnet]} ***"
+          puts "#{Time.now}*** Responding to Avahi #{reply.fullname} Providing service for: #{web_server_uri} via DRB: #{drb_uri} and  and subnet: #{options[:subnet]} ***"
 
           #acl = ACL.new(["allow", "all"])
           #           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
@@ -81,12 +83,11 @@ def run_drb_daemons(options)
           ### Ancounce Service to Server by sending a post request
           ### trying it several times, as avahi service may be up and running before web-server is ready
 
-          try_counter=0; try_max=5
+          try_counter=0; try_max=10
 
           loop do
             begin
-
-              puts "*** try connecting to : #{drb_uri}"
+              puts "#{Time.now} *** try connecting to : #{drb_uri}"
               RestClient.post web_server_uri+'/connectors', {:connector => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
               puts "*** connection succesfully established"
               break
@@ -115,17 +116,20 @@ def run_drb_daemons(options)
       end
 
     else
-      puts "Lost Service: #{reply}"
+      puts "#{Time.now} Service lost via AVAHI: #{reply}"
       unless  services[reply.fullname].nil?
 
         ## check if server is down or just a short avahi problem (lost connection)
 
         begin
-          result=RestClient.get web_server_uri+'/get_server_status'
+          RestClient.post web_server_uri+'/connectors', {:connector => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
+          puts "Still connected to #{web_server_uri} - no problem"
+	  $stdout.flush
         rescue => e
           services.delete(reply.fullname)
           DRb.stop_service
-          puts "Disconnected from Service: #{reply.fullname}"
+          puts "Disconnected from Service: #{reply.fullname} no connection to: #{web_server_uri}"
+	  $stdout.flush
         end
 
       end
