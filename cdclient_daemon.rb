@@ -23,6 +23,7 @@ def terminate(options, web_server_uri)
   RestClient.delete web_server_uri+"/connectors/#{options[:uid]}", {:content_type => :json, :accept => :json}
 
   sleep(1)
+
   DRb.stop_service
   exit
 
@@ -58,30 +59,21 @@ def run_drb_daemons(options)
           ## Create the uri of the web-server to sent confirmation, read from the service request
           web_server_uri="#{r.target}:#{r.port}"
 
-
           #generate Service Object for DRB
           service_obj=Object.const_get(options[:service]).new(web_server_uri,options)
 
           ### Start DRB Service
           puts "#{Time.now}*** Responding to Avahi #{reply.fullname} Providing service for: #{web_server_uri} via DRB: #{drb_uri} and  and subnet: #{options[:subnet]} ***"
 
-          #acl = ACL.new(["allow", "all"])
-          #           acl = ACL.new(["deny", "all", "allow", "localhost", "allow", "#{options[:subnet]}"])
-
           acl = ACL.new(%W(deny all
                            allow #{options[:subnet]}.*
                            allow localhost))
 
           DRb.install_acl(acl)
-
-
           DRb.start_service(drb_uri, service_obj)
-
-
           DRb.uri
 
-          ### Ancounce Service to Server by sending a post request
-          ### trying it several times, as avahi service may be up and running before web-server is ready
+          ### Ancounce Service to Server by sending a post request, trying it several times, as avahi service may be up and running before web-server is ready
 
           try_counter=0; try_max=10
 
@@ -99,7 +91,6 @@ def run_drb_daemons(options)
             end
           end
 
-
           break unless r.flags.more_coming?
 
         end
@@ -112,23 +103,24 @@ def run_drb_daemons(options)
           terminate(options, web_server_uri)
         end
 
-
       end
 
     else
-      puts "#{Time.now} Service lost via AVAHI: #{reply}"
+
       unless  services[reply.fullname].nil?
 
         ## check if server is down or just a short avahi problem (lost connection)
 
         begin
+          puts "************* #{Time.now} Service lost via AVAHI: #{reply.fullname}.. try reconnect to #{web_server_uri} *****************"
+          sleep(1) ### give the server some time, assuming the network was down for a second
           RestClient.post web_server_uri+'/connectors', {:connector => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
-          puts "Still connected to #{web_server_uri} - no problem"
+          puts "Web-Server available , connection refreshed."
 	  $stdout.flush
         rescue => e
           services.delete(reply.fullname)
           DRb.stop_service
-          puts "Disconnected from Service: #{reply.fullname} no connection to: #{web_server_uri}"
+          puts "** !!!!! Disconnected from Service, no connection!!!!!!"
 	  $stdout.flush
         end
 
