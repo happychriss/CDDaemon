@@ -3,7 +3,11 @@ require_relative '../lib/support'
 class Converter
 
 
-  SOURCE_SCANNER=0
+  PAGE_SOURCE_SCANNED=0
+  PAGE_SOURCE_UPLOADED=1
+  PAGE_SOURCE_MOBILE=2
+  PAGE_SOURCE_MIGRATED=99
+
 
   include Support
 
@@ -99,7 +103,7 @@ class Converter
         puts "------------ Start conversion for jpg: Source: '#{fpath}' Target: '#{fpath+'.conv'}'----------"
 
         #### Run additional unpaper from orignal file, if not the speed option is selected
-        if source==SOURCE_SCANNER  and not @unpaper_speed
+        if source==PAGE_SOURCE_SCANNED  and not @unpaper_speed
           puts "Source: Scanner without speed option - run additional unpaper..."
           res=%x[convert '#{fpath}'[0] '#{fpath}.ppm'] #convert only first page if more exists
           %x[unpaper -v --overwrite  --mask-scan-size 120 --post-size a4 --sheet-size a4 --no-grayfilter --no-blackfilter  --pre-border 0,200,0,0 '#{fpath}.ppm' '#{fpath}.unpaper']
@@ -121,7 +125,7 @@ class Converter
 
           ## pfq 20, reduce quality to 20% if from scanner
 
-          if source==SOURCE_SCANNER then #Source is scanner, reduce size
+          if source==PAGE_SOURCE_SCANNED then #Source is scanner, reduce size
             reduce='-pfq 20'
             puts "Source is scanner, reduction with: #{reduce}"
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
@@ -155,7 +159,7 @@ class Converter
         if @ocr_tesseract_available or @ocr_abby_available then
 
           #### jpg immages are stored as jpge images in the system
-          if source==SOURCE_SCANNER
+          if source==PAGE_SOURCE_SCANNED or source==PAGE_SOURCE_MOBILE
             result_new_pdf=File.open(fpath+'.conv') ## PDF return
           else
             result_new_pdf=nil
