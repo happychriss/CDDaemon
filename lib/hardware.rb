@@ -27,6 +27,8 @@ class Hardware
 
     @start_copy_button = @gpio_pins.new_pin(pin: :PI15, direction: :in, pull: :up)
 
+    @scanner_button_thread=nil
+
 
   end
 
@@ -63,14 +65,17 @@ class Hardware
     end
   end
 
-  def watch_scanner_start_button
-    new_thread = Thread.new do
-      @start_copy_button.client_watch(0) do
-        RestClient.post @web_server_uri+'/start_scanner_from_hardware', {}, :content_type => :json, :accept => :json
-      end
+def watch_scanner_start_button
+    if @scanner_button_thread.nil? ### only one thread should be created, also if called several times by the server
+        $stdout.flush 
+        @scanner_button_thread = Thread.new do
+           @start_copy_button.client_watch(0) do
+           RestClient.post @web_server_uri+'/start_scanner_from_hardware', {}, :content_type => :json, :accept => :json
+       end
     end
-
   end
+ end
+
 
   def update_status_leds
     new_thread = Thread.new do

@@ -28,14 +28,15 @@ end
 
 # Tries several times to connect to the webserver
 def connect_to_webserver(drb_uri, options, web_server_uri)
-  try_counter=0; try_max= 2
+  try_counter=0; try_max= 10
 
       loop do
         begin
           puts "#{Time.now} *** try connecting to : #{drb_uri}"
-          sleep(rand*5)
+          sleep(5+rand*2)
           RestClient.post web_server_uri+'/connectors', {:connector => {:service => options[:service], :uri => drb_uri, :uid => options[:uid], :prio => options[:prio]}}, :content_type => :json, :accept => :json
           puts "*** connection succesfully established"
+      $stdout.flush 
           return true
         rescue => e
           try_counter=try_counter+1
@@ -43,6 +44,7 @@ def connect_to_webserver(drb_uri, options, web_server_uri)
 
           if try_counter==try_max
             puts "Disconnected from Service: #{web_server_uri}"
+      $stdout.flush 
             return false
           end
 
@@ -128,6 +130,7 @@ def run_drb_daemons(options)
         end
 
       end
+      $stdout.flush 
     end
 
   end
