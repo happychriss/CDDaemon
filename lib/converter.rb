@@ -125,9 +125,9 @@ class Converter
 
           ## pfq 20, reduce quality to 20% if from scanner
 
-          if source==PAGE_SOURCE_SCANNED then #Source is scanner, reduce size
+          if source==PAGE_SOURCE_SCANNED or source==PAGE_SOURCE_MOBILE then #Source is scanner, reduce size
             reduce='-pfq 20'
-            puts "Source is scanner, reduction with: #{reduce}"
+            puts "Source is scanner or mobile, reduction with: #{reduce} - will be stored as PDF"
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
             res = %x[#{command}]
 
@@ -136,7 +136,7 @@ class Converter
             res = %x[#{command}]
           else
             reduce='-pfpr original'
-            puts "Source is not scanner, dont reduce jpg with: #{reduce}"
+            puts "Source is not scanner, dont reduce jpg with: #{reduce} - will be stored as JPG"
 
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
             res = %x[#{command}]
