@@ -28,7 +28,7 @@ end
 
 # Tries several times to connect to the webserver
 def connect_to_webserver(drb_uri, options, web_server_uri)
-  try_counter=0; try_max= 10
+  try_counter=0; try_max= 1
 
       loop do
         begin
@@ -60,7 +60,6 @@ def run_drb_daemons(options)
   drb_uri="druby://#{Socket.gethostname}:#{options[:port]}" ## Create uri of drb-service that is the current host and the port from the config file
   avahi_name="Cleandesk_#{options[:avahi_prefix]}" ## Create Avahi Service Name, this is the avahi service the daemon is looking for
   service_obj=nil
-  connection_count=0
   connected=false
 
   puts "****** Waiting for Service request avahi: #{avahi_name}"
@@ -71,10 +70,9 @@ def run_drb_daemons(options)
 
       if reply.flags.add? then
 
-        connection_count=connection_count+1
-        puts "#{Time.now}: Found Service: #{reply.fullname} - count: #{connection_count}"
+        puts "#{Time.now}: Found Service: #{reply.fullname} - connected:#{connected}"
 
-        if connection_count==1 and not connected
+        if not connected
 
           ## Start DRB Service and connect to URI
           DNSSD::Service.new.resolve reply do |r|
@@ -105,6 +103,9 @@ def run_drb_daemons(options)
             ### Ancounce Service to Server by sending a post request, trying it several times, as avahi service may be up and running before web-server is ready
             connected=connect_to_webserver(drb_uri, options, web_server_uri)
 
+            $stdout.flush
+
+
             break unless r.flags.more_coming?
 
           end
@@ -120,18 +121,21 @@ def run_drb_daemons(options)
         end
 
       else
-        connection_count=connection_count-1
-        puts "#{Time.now}: Lost Service: #{reply.fullname} - count: #{connection_count}"
+        puts "#{Time.now}: Lost Service: #{reply.fullname} - connected:#{connected}"
 
-        if connection_count==1 and connected
+        if connected
           puts "#{Time.now} ******* Lost CONFIGURED service for: #{reply.fullname}.. try reconnect to #{web_server_uri} *****************"
           sleep(1) ### give the server some time, assuming the network was down for a second  and trie to reconnect
           connected=connect_to_webserver(drb_uri, options, web_server_uri)
+          $stdout.flush
+
         end
 
       end
-      $stdout.flush 
+
     end
+
+    $stdout.flush
 
   end
 
