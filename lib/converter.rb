@@ -89,13 +89,13 @@ class Converter
 
           result_txt = read_txt_from_conv_txt(fpath.untaint)
 
-          converter_upload_pdf(result_txt,nil, page_id)
+          converter_upload_pdf(result_txt,File.open(fpath), page_id)
 
         end
 
 
         ############################################################## JPG File ###############################################
-        ### create PDF, scann for text
+        ### Source is Scanner / Upload from Mobile / Upload from PC
 
       elsif [:JPG].include?(mime_type) then
 
@@ -156,14 +156,18 @@ class Converter
           res = %x[#{command}]
         end
 
-        if @ocr_tesseract_available or @ocr_abby_available then
+        if @ocr_tesseract_available or @ocr_abby_available
 
-          #### jpg immages are stored as jpge images in the system
-          if source==PAGE_SOURCE_SCANNED or source==PAGE_SOURCE_MOBILE
-            result_new_pdf=File.open(fpath+'.conv') ## PDF return
+
+
+          if source==PAGE_SOURCE_UPLOADED
+            puts "Return normal JPG - Uploaded"
+            result_new_pdf=File.open(fpath) # uploaded jpg file will not be stored as converted PFD
           else
-            result_new_pdf=nil
-            end
+            puts "Return normal Converted PDF"
+            result_new_pdf=File.open(fpath+'.conv') ## PDF return
+          end
+
 
           puts "ok with res: #{res}"
 
@@ -209,7 +213,7 @@ class Converter
         res=%x[#{tika_path} -t '#{fpath}' >> #{fpath+'.conv.txt'}]
 
         result_txt = read_txt_from_conv_txt(fpath)
-        converter_upload_pdf(result_txt, nil, page_id)
+        converter_upload_pdf(result_txt, File.open(fpath), page_id)
 
       else
         raise "Unkonw mime -type  *#{mime_type}*"
