@@ -124,9 +124,11 @@ class Converter
           converter_status_update("JPG-Abby")
 
           ## pfq 20, reduce quality to 20% if from scanner
+          ## Update after upgrade to Ubuntu 16.04, abbyocr create bad jpg PDF when started with -pfq 2ß, therefore change to pfpr orignal
 
           if source==PAGE_SOURCE_SCANNED or source==PAGE_SOURCE_MOBILE then #Source is scanner, reduce size
-            reduce='-pfq 20'
+#            reduce='-pfq 20'
+            reduce='-pfpr original'
             puts "Source is scanner or mobile, reduction with: #{reduce} - will be stored as PDF"
             command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
             res = %x[#{command}]
