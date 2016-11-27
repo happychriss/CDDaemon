@@ -1,4 +1,23 @@
 #! /bin/sh
+debug_me=true
+
+
+  # Close STDOUT
+  exec 1<&-
+  # Close STDERR
+  exec 2<&-
+
+  LOG_FILE=//home/cds/CDDaemon/gpio_server/gpio_server_boot.log
+
+  # Open STDOUT as $LOG_FILE file for read and write.
+  exec 1<>$LOG_FILE
+
+  # Redirect STDERR to STDOUT
+  exec 2>&1
+
+  # Display shell commands with expanded args
+  set -x
+
 
 ### BEGIN INIT INFO
 # Provides:          gpio_server to allow sudo access to io hardware of cubietruck
@@ -16,7 +35,7 @@ NAME=gpio_server
 
 #### Parameter ###############################
 DAEMON_HOME=//home/cds/CDDaemon
-DAEMON_LOG=$DAEMON_HOME
+DAEMON_LOG=//tmp
 DAEMON_PORT=8780
 DAEMON_ACL="192.168.1"
 VERBOSE="y"
