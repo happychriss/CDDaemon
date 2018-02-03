@@ -146,7 +146,7 @@ class Converter
             res = %x[#{command}]
           end
 =end
-          command="abbyyocr11 -rl German,English,GermanNewSpelling  -if '#{fopath}' -f PDF -pfr 100 -of '#{fpath}.conv'"
+          command="abbyyocr11 -rl German,English,GermanNewSpelling  -if '#{fopath}' -f PDF -pfr 200 -of '#{fpath}.conv'"
           puts "Scanning with new engine abby11 and command #{command}"
           res = %x[#{command}]
 
@@ -192,7 +192,7 @@ class Converter
 
       elsif [:MS_EXCEL, :MS_WORD, :ODF_CALC, :ODF_WRITER].include?(mime_type) then
 
-        tika_path=File.join(Dir.pwd, "lib", "tika-app-1.4.jar")
+        tika_path=File.join(Dir.pwd, "lib", "tika-app-1.17.jar")
 
         check_program('convert'); check_program('html2ps'); check_program(tika_path) ##jar can be called directly
 
