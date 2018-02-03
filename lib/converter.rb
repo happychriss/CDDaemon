@@ -192,9 +192,9 @@ class Converter
 
       elsif [:MS_EXCEL, :MS_WORD, :ODF_CALC, :ODF_WRITER].include?(mime_type) then
 
-        tika_path=File.join(Dir.pwd, "lib", "tika-app-1.17.jar")
+        tika_path="/usr/bin/java -jar "+File.join(Dir.pwd, "lib", "tika-app-1.17.jar")
 
-        check_program('convert'); check_program('html2ps'); check_program(tika_path) ##jar can be called directly
+        check_program('convert'); check_program('html2ps'); check_program("/usr/bin/java")
 
         ############### Create Preview Pictures of uploaded file
 
