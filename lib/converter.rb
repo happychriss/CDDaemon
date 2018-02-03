@@ -13,7 +13,7 @@ class Converter
 
   def initialize(web_server_uri,options)
     @web_server_uri=web_server_uri
-    @ocr_abby_available=linux_program_exists?('abbyyocr')
+    @ocr_abby_available=linux_program_exists?('abbyyocr11')
     @ocr_tesseract_available=linux_program_exists?('tesseract')
     puts "********* Init Converter with: #{@web_server_uri} / Abby-OCR:#{@ocr_abby_available} / Tesseract-OCR:#{@ocr_tesseract_available}*******"
     @unpaper_speed=options[:unpaper_speed]=='y'
@@ -81,10 +81,11 @@ class Converter
         ## only abby OCD supports PDF as input for OCR
         if @ocr_abby_available then
 
-          check_program('abbyyocr')
+          check_program('abbyyocr11')
           converter_status_update("PDF-Abby")
 
-          command="abbyyocr -fm -rl German GermanNewSpelling  -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
+          command="abbyyocr11 -rl German GermanNewSpelling -f TextUnicodeDefaults -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
+
           res = %x[#{command}]
 
           result_txt = read_txt_from_conv_txt(fpath.untaint)
@@ -120,17 +121,18 @@ class Converter
         #### Use Abby if available ###########################
         if @ocr_abby_available then
 
-          check_program('abbyyocr')
+          check_program('abbyyocr11')
           converter_status_update("JPG-Abby")
 
           ## pfq 20, reduce quality to 20% if from scanner
           ## Update after upgrade to Ubuntu 16.04, abbyocr create bad jpg PDF when started with -pfq 2ß, therefore change to pfpr orignal
 
+=begin
           if source==PAGE_SOURCE_SCANNED or source==PAGE_SOURCE_MOBILE then #Source is scanner, reduce size
 #            reduce='-pfq 20'
             reduce='-pfpr original'
             puts "Source is scanner or mobile, reduction with: #{reduce} - will be stored as PDF"
-            command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
+            command="abbyyocr11 -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.big.conv'"
             res = %x[#{command}]
 
             ## change size to normal a4
@@ -140,9 +142,14 @@ class Converter
             reduce='-pfpr original'
             puts "Source is not scanner, dont reduce jpg with: #{reduce} - will be stored as JPG"
 
-            command="abbyyocr -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
+            command="abbyyocr11 -rl German GermanNewSpelling  -if '#{fopath}' -f PDF -pem ImageOnText #{reduce} -of '#{fpath}.conv'"
             res = %x[#{command}]
           end
+=end
+          command="abbyyocr11 -rl German,English,GermanNewSpelling  -if '#{fopath}' -f PDF -pfr 100 -of '#{fpath}.conv'"
+          puts "Scanning with new engine abby11 and command #{command}"
+          res = %x[#{command}]
+
 
           #### Use Abby if available ###########################
         elsif @ocr_tesseract_available then

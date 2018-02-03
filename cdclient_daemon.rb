@@ -83,6 +83,7 @@ def run_drb_daemons(options)
             if service_obj.nil? or not service_obj.alive?
 
               #generate Service Object for DRB
+
               service_obj=Object.const_get(options[:service]).new(web_server_uri, options)
 
               ### Start DRB Service
