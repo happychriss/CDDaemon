@@ -86,7 +86,7 @@ class Converter
 
           command="abbyyocr11 -rl German GermanNewSpelling -f TextUnicodeDefaults -if '#{fpath}' -tet UTF8 -of '#{fpath}.conv.txt'"
 
-          res = %x[#{command}]
+          res=start_abbyy(command);
 
           result_txt = read_txt_from_conv_txt(fpath.untaint)
 
@@ -148,7 +148,7 @@ class Converter
 =end
           command="abbyyocr11 -rl German,English,GermanNewSpelling  -if '#{fopath}' -f PDF -pfr 200 -of '#{fpath}.conv'"
           puts "Scanning with new engine abby11 and command #{command}"
-          res = %x[#{command}]
+          res=start_abbyy(command);
 
 
           #### Use Abby if available ###########################
@@ -289,6 +289,14 @@ class Converter
     RestClient.post @web_server_uri+'/convert_status', {:message => message}, :content_type => :json, :accept => :json
   end
 
+  def start_abbyy(command)
+    puts "Start ABBYY with command: #{command}"
+    while (`ps aux | grep abbyyocr[1]` != "")
+      puts("wait a sec....found a parallel running one");sleep(1)
+    end
+    return %x[#{command}]
 
-    private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update, :converter_upload_jpgs, :converter_upload_pdf
+  end
+
+    private :read_txt_from_conv_txt, :convert_jpg, :convert_sjpg, :converter_status_update, :converter_upload_jpgs, :converter_upload_pdf, :start_abbyy
 end
